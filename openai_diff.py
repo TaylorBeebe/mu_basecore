@@ -1,11 +1,10 @@
 import openai
 import subprocess
 import os
-import io
 import re
 import time
 
-global_api_key = "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"
+global_api_key = ""
 start_commit = "4680f5292610e4fdf0872a8daf1c69ce421405b1"
 end_commit = "c28e7e68391b68339468afd8a5ee8dc9bf9156ff"
 directory = "C:\MSFT\DocumentationDumpTest"
