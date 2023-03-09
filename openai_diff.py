@@ -9,6 +9,7 @@ start_commit = "4680f5292610e4fdf0872a8daf1c69ce421405b1"
 end_commit = "c28e7e68391b68339468afd8a5ee8dc9bf9156ff"
 directory = "C:\MSFT\DocumentationDumpTest"
 model = "text-davinci-003"
+chatmodel = "gpt-3.5-turbo"
 max_prompt_token_limit = 2048
 
 def break_up_large_files(file_path):
@@ -140,7 +141,7 @@ def get_completion(prompt, file_path, api_key=global_api_key, max_tokens=2048, t
         try:
             response = openai.Completion.create(
                 api_key=api_key,
-                engine="text-davinci-003",
+                engine=model,
                 prompt=prompt,
                 max_tokens=max_tokens,
                 temperature=temperature,
@@ -150,6 +151,31 @@ def get_completion(prompt, file_path, api_key=global_api_key, max_tokens=2048, t
                 stop=None,
             )
             return response["choices"][0]["text"]
+        except openai.APIError as e:
+            retry_count += 1
+            if (retry_count < 3):
+                print("API Error. Waiting 60 seconds to try again...")
+                time.sleep(60)
+                continue
+            print ("Unable to get completion for file: " + file_path)
+            return "Error"
+        except Exception as e:
+            print ("Unable to get completion for file: " + file_path)
+            return "Error"
+
+def get_chat_completion(prompt, file_path, api_key=global_api_key, max_tokens=2048, temperature=0.5, n=1):
+    retry_count = 0
+    while True:
+        try:
+            response = openai.ChatCompletion.create(
+                api_key=api_key,
+                model = chatmodel,
+                messages=[
+                    {"role" : "system", "content" : "You are an expert on the differences between Project Mu and EDK II. You are prompted with git diffs and provide justifications for them."},
+                    {"role" : "user", "content" : prompt}
+                ]
+            )
+            return response['choices'][0]['message']['content']
         except openai.APIError as e:
             retry_count += 1
             if (retry_count < 3):
@@ -189,6 +215,12 @@ if __name__ == "__main__":
 
     print ("OpenAI responses will be deposited in directory: " + output_path)
 
+    use_chat_gpt = False
+    user_input = input("Do you want to use the ChatGPT model? Press 'y' for yes or any other key for no: ")
+
+    if (user_input == 'y'):
+        use_chat_gpt = True
+
     if not os.path.exists(output_path):
         os.makedirs(output_path)
     
@@ -199,8 +231,13 @@ if __name__ == "__main__":
         with open(os.path.join(diff_cunks_path, patch_file), "rb") as f:
             print ("Processing file: " + patch_file)
             patch = f.read().decode()
-            openai_prompt = "Write a justification for this EDK II diff:\n" + patch
-            generated_output = get_completion(openai_prompt, os.path.join(diff_cunks_path, patch_file))
+            if not use_chat_gpt:
+                openai_prompt = "Write a justification for this EDK II diff:\n" + patch
+                generated_output = get_completion(openai_prompt, os.path.join(diff_cunks_path, patch_file))
+            else:
+                openai_prompt = patch
+                generated_output = get_chat_completion(openai_prompt, os.path.join(diff_cunks_path, patch_file))
+
             if (generated_output != "Error"):
                 with open(os.path.join(output_path, patch_file + ".txt"), "w") as f:
                     f.write(wrap_text(generated_output).lstrip())
