@@ -44,7 +44,8 @@
 
 [Sources.AARCH64]
   AArch64/EbcSupport.c
-  AArch64/EbcLowLevel.S
+  AArch64/EbcLowLevel.S | GCC
+  AArch64/EbcLowLevel.asm | MSFT
 
 [Packages]
   MdePkg/MdePkg.dec

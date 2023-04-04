@@ -86,11 +86,16 @@
   Arm/CompareGuid.S   |GCC
 
 [Sources.AARCH64]
-  AArch64/ScanMem.S
-  AArch64/SetMem.S
-  AArch64/CopyMem.S
-  AArch64/CompareMem.S
-  AArch64/CompareGuid.S
+  AArch64/ScanMem.S         | GCC
+  AArch64/ScanMem.asm       | MSFT
+  AArch64/SetMem.S          | GCC
+  AArch64/SetMem.asm        | MSFT
+  AArch64/CopyMem.S         | GCC
+  AArch64/CopyMem.asm       | MSFT
+  AArch64/CompareMem.S      | GCC
+  AArch64/CompareMem.asm    | MSFT
+  AArch64/CompareGuid.S     | GCC
+  AArch64/CompareGuid.asm   | MSFT
 
 [Sources.ARM, Sources.AARCH64]
   Arm/ScanMemGeneric.c

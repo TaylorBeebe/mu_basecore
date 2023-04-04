@@ -19,6 +19,7 @@ typedef UINTN size_t;
 #define GLOBAL_USED
 #endif
 
+#if !defined (_MSC_VER)
 /* OpenSSL will use floating point support, and C compiler produces the _fltused
    symbol by default. Simply define this symbol here to satisfy the linker. */
 // int  GLOBAL_USED _fltused = 1; // MU_CHANGE use the handy FltUsedLib instead
@@ -52,7 +53,6 @@ memset (
 
   return dest;
 }
-
 /* Compare bytes in two buffers. */
 int
 memcmp (
@@ -63,6 +63,7 @@ memcmp (
 {
   return (int)CompareMem (buf1, buf2, count);
 }
+#endif
 
 int
 strcmp (
