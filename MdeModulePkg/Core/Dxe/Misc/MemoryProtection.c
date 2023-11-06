@@ -78,6 +78,9 @@ STATIC MEMORY_PROTECTION_DEBUG_PROTOCOL  mMemoryProtectionDebug =
   IsGuardPage,
   GetImageList
 };
+
+BOOLEAN  mPageAttributesInitialized = FALSE;
+
 // MS_CHANGE - END
 
 /**
@@ -720,18 +723,25 @@ GetPermissionAttributeForMemoryType (
   // } else {
   //   return 0;
   // }
+  // MU_CHANGE END
+
+  UINT64  Attributes = 0;
 
   // Handle code allocations according to the NX_COMPAT DLL flag. If the flag is
   // set, the image should update the attributes of code type allocates when it's ready to execute them.
   if (IsCodeType (MemoryType) && !IsSystemNxCompatible ()) {
-    return 0;
-  } else if (GetDxeMemoryTypeSettingFromBitfield (MemoryType, gDxeMps.NxProtectionPolicy)) {
-    return EFI_MEMORY_XP;
+    return Attributes;
   }
 
-  return 0;
+  if (GetDxeMemoryTypeSettingFromBitfield (MemoryType, gDxeMps.NxProtectionPolicy)) {
+    Attributes |= EFI_MEMORY_XP;
+  }
 
-  // MU_CHANGE END
+  if ((MemoryType == EfiConventionalMemory) && gDxeMps.MarkFreeMemoryReadOnly && mPageAttributesInitialized) {
+    Attributes |= EFI_MEMORY_RP;
+  }
+
+  return Attributes;
 }
 
 /**
@@ -1079,12 +1089,11 @@ MemoryProtectionCpuArchProtocolNotify (
   //
   // Apply the memory protection policy on non-BScode/RTcode regions.
   //
-  // MU_CHANGE START Update to use memory protection settings HOB
+  // MU_CHANGE START: This function is now called after the GCD sync process has completed
   // if (PcdGet64 (PcdDxeNxMemoryProtectionPolicy) != 0) {
-  if (gDxeMps.NxProtectionPolicy.Data) {
-    // MU_CHANGE END
-    InitializeDxeNxMemoryProtectionPolicy ();
-  }
+  //   InitializeDxeNxMemoryProtectionPolicy ();
+  // }
+  // MU_CHANGE END
 
   //
   // Call notify function meant for Heap Guard.
@@ -1295,7 +1304,7 @@ CoreInitializeMemoryProtection (
   )
 {
   EFI_STATUS  Status;
-  EFI_EVENT   Event;
+  // EFI_EVENT   Event;
   EFI_EVENT   DisableNullDetectionEvent;
   EFI_EVENT   EnableNullDetectionEvent;     // MU_CHANGE
   EFI_EVENT   MemoryAttributeProtocolEvent; // MU_CHANGE
@@ -1311,37 +1320,38 @@ CoreInitializeMemoryProtection (
   // - EfiConventionalMemory and EfiBootServicesData should use the
   //   same attribute
   //
-  // MU_CHANGE START: We allow code types to have NX
+  // MU_CHANGE START: We allow code types to have NX and EfiBootServicesData to differ in attributes from
+  //                  EfiConventionalMemory
   // ASSERT ((GetPermissionAttributeForMemoryType (EfiBootServicesCode) & EFI_MEMORY_XP) == 0);
   // ASSERT ((GetPermissionAttributeForMemoryType (EfiRuntimeServicesCode) & EFI_MEMORY_XP) == 0);
   // ASSERT ((GetPermissionAttributeForMemoryType (EfiLoaderCode) & EFI_MEMORY_XP) == 0);
+  // ASSERT (
+  //   GetPermissionAttributeForMemoryType (EfiBootServicesData) ==
+  //   GetPermissionAttributeForMemoryType (EfiConventionalMemory)
+  //   );
   // MU_CHANGE END
-  ASSERT (
-    GetPermissionAttributeForMemoryType (EfiBootServicesData) ==
-    GetPermissionAttributeForMemoryType (EfiConventionalMemory)
-    );
 
-  Status = CoreCreateEvent (
-             EVT_NOTIFY_SIGNAL,
-             // MU_CHANGE START: Use Project Mu Arch Protocol Notify
-             TPL_CALLBACK - 1,
-             //  MemoryProtectionCpuArchProtocolNotify,
-             MemoryProtectionCpuArchProtocolNotifyMu,
-             // MU_CHANGE END
-             NULL,
-             &Event
-             );
-  ASSERT_EFI_ERROR (Status);
+  // Status = CoreCreateEvent (
+  //            EVT_NOTIFY_SIGNAL,
+  //            // MU_CHANGE START: Use Project Mu Arch Protocol Notify
+  //            TPL_CALLBACK - 1,
+  //            //  MemoryProtectionCpuArchProtocolNotify,
+  //            MemoryProtectionCpuArchProtocolNotifyMu,
+  //            // MU_CHANGE END
+  //            NULL,
+  //            &Event
+  //            );
+  // ASSERT_EFI_ERROR (Status);
 
-  //
-  // Register for protocol notifactions on this event
-  //
-  Status = CoreRegisterProtocolNotify (
-             &gEfiCpuArchProtocolGuid,
-             Event,
-             &Registration
-             );
-  ASSERT_EFI_ERROR (Status);
+  // //
+  // // Register for protocol notifactions on this event
+  // //
+  // Status = CoreRegisterProtocolNotify (
+  //            &gEfiCpuArchProtocolGuid,
+  //            Event,
+  //            &Registration
+  //            );
+  // ASSERT_EFI_ERROR (Status);
 
   // MU_CHANGE START: Register an event to populate the memory attribute protocol
   Status = CoreCreateEvent (
@@ -1363,6 +1373,13 @@ CoreInitializeMemoryProtection (
              );
   ASSERT_EFI_ERROR (Status);
   // MU_CHANGE END
+
+  // MU_CHANGE START: Add event to apply page attribues according to the memory protection policy
+  //                  after the GCD has synced.
+  Status = RegisterPageAccessAttributesUpdateOnGcdSyncComplete ();
+  ASSERT_EFI_ERROR (Status);
+  // MU_CHANGE END
+
   //
   // Register a callback to disable NULL pointer detection at EndOfDxe
   //
@@ -1491,20 +1508,24 @@ ApplyMemoryProtectionPolicy (
   UINT64  OldAttributes;
   UINT64  NewAttributes;
 
+  // DEBUG ((DEBUG_INFO, "ApplyMemoryProtectionPolicy: 0x%016lx - 0x%016lx\n", Memory, Length));
+
   //
-  // The policy configured in Dxe NX Protection Policy // MU_CHANGE
+  // The policy configured in gDxeMps.NxProtectionPolicy // MU_CHANGE
   // does not apply to allocations performed in SMM mode.
   //
-  if (IsInSmm ()) {
-    return EFI_SUCCESS;
-  }
+  // MU_CHANGE START: Allow access attributes to applied during SMM init
+  // if (IsInSmm ()) {
+  //   return EFI_SUCCESS;
+  // }
+  // MU_CHANGE END
 
   //
   // If the CPU arch protocol is not installed yet, we cannot manage memory
   // permission attributes, and it is the job of the driver that installs this
   // protocol to set the permissions on existing allocations.
   //
-  if (gCpu == NULL) {
+  if (gCpu == NULL || !mPageAttributesInitialized) {
     return EFI_SUCCESS;
   }
 

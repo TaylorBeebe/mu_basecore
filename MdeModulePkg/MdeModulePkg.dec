@@ -813,6 +813,10 @@
   ## Include/Protocol/VariablePolicy.h
   gEdkiiVariablePolicyProtocolGuid = { 0x81D1675C, 0x86F6, 0x48DF, { 0xBD, 0x95, 0x9A, 0x6E, 0x4F, 0x09, 0x25, 0xC3 } }
 
+  ## MU_CHANGE START: Add protocol to indicate the GCD sync has completed
+  ## Include/Protocol/Cpu.h
+  gEdkiiGcdSyncComplete                 = { 0x650B7F40, 0x6564, 0x4FA9, { 0x93, 0x75, 0xCD, 0x6B, 0x52, 0x1B, 0x6E, 0x50 }}
+  ## MU_CHANGE END
 [PcdsFeatureFlag]
   ## Indicates if the platform can support update capsule across a system reset.<BR><BR>
   #   TRUE  - Supports update capsule across a system reset.<BR>

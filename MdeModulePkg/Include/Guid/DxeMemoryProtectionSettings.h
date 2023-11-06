@@ -22,10 +22,9 @@ typedef union {
 typedef union {
   UINT8    Data;
   struct {
-    UINT8    UefiPageGuard        : 1;
-    UINT8    UefiPoolGuard        : 1;
-    UINT8    UefiFreedMemoryGuard : 1;
-    UINT8    Direction            : 1;
+    UINT8    UefiPageGuard : 1;
+    UINT8    UefiPoolGuard : 1;
+    UINT8    Direction     : 1;
   } Fields;
 } DXE_HEAP_GUARD_POLICY;
 
@@ -82,6 +81,10 @@ typedef struct {
   //  FALSE - UEFI Stack Guard will be disabled.
   BOOLEAN                                   CpuStackGuard;
 
+  // If enabled, all EfiConventionalMemory will be marked with EFI_MEMORY_RO. This can
+  // be used in conjunction with the NX setting for EfiConventionalMemory.
+  BOOLEAN                                   MarkFreeMemoryReadOnly;
+
   // Bitfield to control the NULL address detection in code for different phases.
   // If enabled, accessing NULL address in UEFI or SMM code can be caught by marking
   // the NULL page as not present.
@@ -106,7 +109,6 @@ typedef struct {
   //
   //  .UefiPageGuard         : Enable UEFI page guard.
   //  .UefiPoolGuard         : Enable UEFI pool guard.
-  //  .UefiFreedMemoryGuard  : Enable UEFI freed-memory guard (Use-After-Free memory detection).
   //  .Direction             : The direction of Guard Page for Pool Guard.
   //                           0 - The returned pool is near the tail guard page.
   //                           1 - The returned pool is near the head guard page.
@@ -152,8 +154,6 @@ typedef struct {
   //
   // If a bit is set, memory regions of the associated type will be mapped
   // non-executable. If a bit is cleared, nothing will be done to associated type of memory.
-  //
-  //  NOTE: - User MUST set the same NX protection for EfiBootServicesData and EfiConventionalMemory.
   DXE_HEAP_GUARD_MEMORY_TYPES    NxProtectionPolicy;
 
   // Indicates if stack cookie protection will be enabled
@@ -185,6 +185,7 @@ extern GUID  gDxeMemoryProtectionSettingsGuid;
           {                                                     \
             DXE_MEMORY_PROTECTION_SETTINGS_CURRENT_VERSION,     \
             TRUE,   /* Stack Guard On */                        \
+            TRUE,   /* Free Memory Guard On*/                   \
             {                                                   \
               .Fields.UefiNullDetection               = 1,      \
               .Fields.DisableEndOfDxe                 = 0,      \
@@ -193,7 +194,6 @@ extern GUID  gDxeMemoryProtectionSettingsGuid;
             {                                                   \
               .Fields.UefiPageGuard                   = 1,      \
               .Fields.UefiPoolGuard                   = 1,      \
-              .Fields.UefiFreedMemoryGuard            = 0,      \
               .Fields.Direction                       = 0       \
             },                                                  \
             {                                                   \
@@ -271,6 +271,7 @@ extern GUID  gDxeMemoryProtectionSettingsGuid;
           {                                                     \
             DXE_MEMORY_PROTECTION_SETTINGS_CURRENT_VERSION,     \
             TRUE,   /* Stack Guard On */                        \
+            TRUE,   /* Free Memory Guard On*/                   \
             {                                                   \
               .Fields.UefiNullDetection               = 1,      \
               .Fields.DisableEndOfDxe                 = 0,      \
@@ -279,7 +280,6 @@ extern GUID  gDxeMemoryProtectionSettingsGuid;
             {                                                   \
               .Fields.UefiPageGuard                   = 1,      \
               .Fields.UefiPoolGuard                   = 0,      \
-              .Fields.UefiFreedMemoryGuard            = 0,      \
               .Fields.Direction                       = 0       \
             },                                                  \
             {                                                   \
@@ -356,6 +356,7 @@ extern GUID  gDxeMemoryProtectionSettingsGuid;
           {                                                     \
             DXE_MEMORY_PROTECTION_SETTINGS_CURRENT_VERSION,     \
             TRUE,   /* Stack Guard On */                        \
+            TRUE,   /* Free Memory Guard On*/                   \
             {                                                   \
               .Fields.UefiNullDetection               = 1,      \
               .Fields.DisableEndOfDxe                 = 0,      \
@@ -364,7 +365,6 @@ extern GUID  gDxeMemoryProtectionSettingsGuid;
             {                                                   \
               .Fields.UefiPageGuard                   = 0,      \
               .Fields.UefiPoolGuard                   = 0,      \
-              .Fields.UefiFreedMemoryGuard            = 0,      \
               .Fields.Direction                       = 0       \
             },                                                  \
             {                                                   \
@@ -440,6 +440,7 @@ extern GUID  gDxeMemoryProtectionSettingsGuid;
           {                                                     \
             DXE_MEMORY_PROTECTION_SETTINGS_CURRENT_VERSION,     \
             FALSE,   /* Stack Guard On */                       \
+            FALSE,   /* Free Memory Guard On*/                  \
             {                                                   \
               .Fields.UefiNullDetection               = 0,      \
               .Fields.DisableEndOfDxe                 = 0,      \
@@ -448,7 +449,6 @@ extern GUID  gDxeMemoryProtectionSettingsGuid;
             {                                                   \
               .Fields.UefiPageGuard                   = 0,      \
               .Fields.UefiPoolGuard                   = 0,      \
-              .Fields.UefiFreedMemoryGuard            = 0,      \
               .Fields.Direction                       = 0       \
             },                                                  \
             {                                                   \
